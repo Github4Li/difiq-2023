@@ -28,44 +28,51 @@ library(tidyverse)
 ### 1.1 Importation
 
 Pour les 2 exercices, les données sont les mêmes. J’importe ces données
-à l’aide du package **readxl**, qui gère les fichiers Excel parfaitement
-(décimales, pourcentages, valeurs manquantes), avec la fonction
-`read_xlsx()`.
+à l’aide du package
+[**tidyquant**](https://business-science.github.io/tidyquant/) qui est
+très performant pour importer entre autres des data financières. Je les
+importe de [*Yahoo
+Finance*](https://fr.finance.yahoo.com/indices-mondiaux) et plus
+particulièrement les indices actions CAC 40, NASDAQ Composite, Nikkei
+225 et SMI. L’échantillon commence en janvier 1990 et se termine en mars
+2023. Je transforme alors ces données en rentabilités.
 
 ``` r
-library(readxl)
-(renta <- read_xlsx(
-  "data.xlsx",
-  sheet = "VaR",
-  skip = 4,
-  col_names = c("Date", "France", "BRIC", "US_Corporate_Bonds")
-))
+library(tidyquant)
+symbols <- c("^FCHI", "^IXIC", "^N225", "^SSMI")
+stock_prices <- symbols %>%
+  tq_get(get  = "stock.prices",
+         from = "1990-01-03",
+         to   = "2023-03-21") %>%
+  group_by(symbol)
+
+(stock_prices %>% slice(1, n()))
 ```
 
-    ## # A tibble: 4,684 x 4
-    ##    Date                   France     BRIC US_Corporate_Bonds
-    ##    <dttm>                  <dbl>    <dbl>              <dbl>
-    ##  1 2003-10-01 00:00:00  0.0238    0.0164            0.000210
-    ##  2 2003-10-02 00:00:00 -0.00182   0.0168           -0.00342 
-    ##  3 2003-10-03 00:00:00  0.0257    0.0159           -0.0102  
-    ##  4 2003-10-06 00:00:00 -0.000820  0.0150            0.00352 
-    ##  5 2003-10-07 00:00:00  0.000733  0.0135           -0.00471 
-    ##  6 2003-10-08 00:00:00  0.00262   0.0197            0.000419
-    ##  7 2003-10-09 00:00:00  0.0161    0.00885          -0.00213 
-    ##  8 2003-10-10 00:00:00  0.000565 -0.00139           0.00297 
-    ##  9 2003-10-13 00:00:00  0.00356   0.0111            0.000496
-    ## 10 2003-10-14 00:00:00 -0.00218  -0.00183          -0.00471 
-    ## # ... with 4,674 more rows
+    ## # A tibble: 8 × 8
+    ## # Groups:   symbol [4]
+    ##   symbol date         open   high    low  close     volume adjusted
+    ##   <chr>  <date>      <dbl>  <dbl>  <dbl>  <dbl>      <dbl>    <dbl>
+    ## 1 ^FCHI  1990-03-01  1836   1838   1827   1832           0    1832 
+    ## 2 ^FCHI  2023-03-20  6901.  7050.  6796.  7013.          0    7013.
+    ## 3 ^IXIC  1990-01-03   461.   462.   460    461.  152660000     461.
+    ## 4 ^IXIC  2023-03-20 11614. 11696. 11551. 11676. 4970630000   11676.
+    ## 5 ^N225  1990-01-04 38922. 38951. 38705. 38713.          0   38713.
+    ## 6 ^N225  2023-03-20 27254. 27367. 26946. 26946.   79200000   26946.
+    ## 7 ^SSMI  1990-11-09  1379.  1389   1375.  1387.          0    1387.
+    ## 8 ^SSMI  2023-03-20 10571. 10690. 10395. 10644.  416073200   10644.
 
-Les données sont issues de Quandl. Vous pouvez remarquer dans la cellule
-B4 du fichier Excel la fonction Quandl qui permet d’importer les données
-*=QSERIES(Index_1 : Index_3 ; Start_date : End_date ; “daily” ; “asc” ;
-“rdiff”)*.
-
-Les données sont un échantillon de rentabilités quotidiennes de deux
-indices actions du Nasdaq (France et BRIC) et d’un indice Merrill Lynch
-obligataire d’entreprises US. L’échantillon commence le 1er octobre 2003
-et se termine à la date du premier cours.
+``` r
+daily_returns <- stock_prices %>%
+  group_by(symbol) %>%
+  tq_transmute(
+    select     = adjusted,
+    mutate_fun = periodReturn,
+    period     = "daily",
+    type       = "arithmetic",
+    col_rename = "dreturns"
+  )
+```
 
 ### 1.2 Démêlage (wrangling en anglais)
 
@@ -75,41 +82,14 @@ data in a form that’s natural to work with often feels like a fight”
 (Grolemund G. and Wickham H.).
 
 Je peux à l’aide du package **DataExplorer** obtenir un résumé des
-données et évaluer si je peux les considérer comme **tidy**. Je vais
-devoir enlever les valeurs manquantes.
+données et évaluer si je peux les considérer comme **tidy**.
 
 ``` r
 library(DataExplorer)
-renta <- renta %>% select(-"Date")
-plot_intro(renta)
+plot_intro(daily_returns)
 ```
 
 ![](VaR_files/figure-gfm/wrangling-1.png)<!-- -->
-
-``` r
-(renta <- renta %>% drop_na())
-```
-
-    ## # A tibble: 4,534 x 3
-    ##       France     BRIC US_Corporate_Bonds
-    ##        <dbl>    <dbl>              <dbl>
-    ##  1  0.0238    0.0164            0.000210
-    ##  2 -0.00182   0.0168           -0.00342 
-    ##  3  0.0257    0.0159           -0.0102  
-    ##  4 -0.000820  0.0150            0.00352 
-    ##  5  0.000733  0.0135           -0.00471 
-    ##  6  0.00262   0.0197            0.000419
-    ##  7  0.0161    0.00885          -0.00213 
-    ##  8  0.000565 -0.00139           0.00297 
-    ##  9  0.00356   0.0111            0.000496
-    ## 10 -0.00218  -0.00183          -0.00471 
-    ## # ... with 4,524 more rows
-
-``` r
-plot_intro(renta)
-```
-
-![](VaR_files/figure-gfm/wrangling-2.png)<!-- -->
 
 ### 1.3 Visualisation
 
@@ -119,25 +99,45 @@ rentabilités d’indices de marché, à savoir la leptokurticité de leur
 densité.
 
 ``` r
-summary(renta)
+daily_returns %>%
+  group_by(symbol) %>%
+  summarise(moyenne = mean(dreturns),
+            ecartype = sd(dreturns),
+            nombre = n(),
+            min = min(dreturns),
+            max = max(dreturns)
+  )
 ```
 
-    ##      France                BRIC            US_Corporate_Bonds  
-    ##  Min.   :-0.1367993   Min.   :-0.1226388   Min.   :-0.0375754  
-    ##  1st Qu.:-0.0060935   1st Qu.:-0.0057636   1st Qu.:-0.0014726  
-    ##  Median : 0.0007368   Median : 0.0010324   Median : 0.0003175  
-    ##  Mean   : 0.0004332   Mean   : 0.0005314   Mean   : 0.0001992  
-    ##  3rd Qu.: 0.0075015   3rd Qu.: 0.0076174   3rd Qu.: 0.0019813  
-    ##  Max.   : 0.1236734   Max.   : 0.1449443   Max.   : 0.0198546
+    ## # A tibble: 4 × 6
+    ##   symbol   moyenne ecartype nombre     min   max
+    ##   <chr>      <dbl>    <dbl>  <int>   <dbl> <dbl>
+    ## 1 ^FCHI  0.000253    0.0137   8391 -0.123  0.112
+    ## 2 ^IXIC  0.000495    0.0147   8367 -0.123  0.142
+    ## 3 ^N225  0.0000653   0.0148   8153 -0.114  0.142
+    ## 4 ^SSMI  0.000313    0.0112   8130 -0.0964 0.114
 
 ``` r
-plot_density(renta)
+daily_returns %>%
+  ggplot(aes(x = dreturns, fill = symbol)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Densités des rentabilités arithmétiques",
+       x = "Rentabilités quotidiennes", y = "Densité") +
+  theme_tq() +
+  scale_fill_tq() +
+  facet_wrap(~ symbol, ncol = 2)
 ```
 
 ![](VaR_files/figure-gfm/viz%20data-1.png)<!-- -->
 
 ``` r
-plot_qq(renta)
+daily_returns %>%
+  ggplot(aes(sample = dreturns, colour = factor(symbol))) +
+  stat_qq() +
+  stat_qq_line() +
+  theme_tq() +
+  scale_fill_tq() +
+  facet_wrap(~ symbol, ncol = 2)
 ```
 
 ![](VaR_files/figure-gfm/viz%20data-2.png)<!-- -->
@@ -157,7 +157,6 @@ VaR_classiques <- function(data, alpha, boot = 100)
 {
   #VaR Historique
   Hist <- quantile(data, probs = alpha)
-  Hist <- unname(Hist)
   Hist <- percent(Hist, 0.01)
   
   #VaR Bootstrap
@@ -179,7 +178,12 @@ VaR_classiques <- function(data, alpha, boot = 100)
   Skt <- qst(alpha, esti$dp["xi"], esti$dp["omega"], esti$dp["alpha"], esti$dp["nu"])
   Skt <- percent(Skt, 0.01)
   
-  return(c(Historique = Hist, Bootstrap = Boot, Gaussienne = Gauss, Skew_Student = Skt))
+  tibble(
+    Historique = Hist,
+    Bootstrap = Boot,
+    Gaussienne = Gauss,
+    Skew_Student = Skt
+  )
 }
 ```
 
@@ -188,59 +192,35 @@ indices avec alpha = 1%.
 
 ``` r
 library(pander)
-l_1 <- list(data = renta, alpha = 0.01)
-VaR_1 <-  pmap(l_1, VaR_classiques)
+VaR_1 <- daily_returns %>%
+  group_by(symbol) %>%
+  reframe(VaR_classiques(dreturns, alpha = 0.01))
 pander(VaR_1)
 ```
 
--   **France**:
-
-    | Historique | Bootstrap | Gaussienne | Skew_Student |
-    |:----------:|:---------:|:----------:|:------------:|
-    |   -4.42%   |  -4.40%   |   -3.42%   |    -4.39%    |
-
--   **BRIC**:
-
-    | Historique | Bootstrap | Gaussienne | Skew_Student |
-    |:----------:|:---------:|:----------:|:------------:|
-    |   -4.00%   |  -3.97%   |   -3.21%   |    -4.10%    |
-
--   **US_Corporate_Bonds**:
-
-    | Historique | Bootstrap | Gaussienne | Skew_Student |
-    |:----------:|:---------:|:----------:|:------------:|
-    |   -0.81%   |  -0.81%   |   -0.71%   |    -0.83%    |
-
-<!-- end of list -->
+| symbol | Historique | Bootstrap | Gaussienne | Skew_Student |
+|:------:|:----------:|:---------:|:----------:|:------------:|
+| ^FCHI  |   -3.94%   |  -3.89%   |   -3.15%   |    -4.47%    |
+| ^IXIC  |   -4.11%   |  -4.10%   |   -3.37%   |    -6.88%    |
+| ^N225  |   -3.94%   |  -3.95%   |   -3.44%   |    -4.07%    |
+| ^SSMI  |   -3.21%   |  -3.22%   |   -2.57%   |    -3.61%    |
 
 Voici ci-dessous les VaR demandées dans *l’exercice 1.1* pour les 3
 indices avec alpha = 0.1%.
 
 ``` r
-l_01 <- list(data = renta, alpha = 0.001)
-VaR_01 <- pmap(l_01, VaR_classiques)
+VaR_01 <- daily_returns %>%
+  group_by(symbol) %>%
+  reframe(VaR_classiques(dreturns, alpha = 0.001))
 pander(VaR_01)
 ```
 
--   **France**:
-
-    | Historique | Bootstrap | Gaussienne | Skew_Student |
-    |:----------:|:---------:|:----------:|:------------:|
-    |   -7.54%   |  -7.79%   |   -4.55%   |   -10.29%    |
-
--   **BRIC**:
-
-    | Historique | Bootstrap | Gaussienne | Skew_Student |
-    |:----------:|:---------:|:----------:|:------------:|
-    |   -8.54%   |  -8.54%   |   -4.28%   |    -9.13%    |
-
--   **US_Corporate_Bonds**:
-
-    | Historique | Bootstrap | Gaussienne | Skew_Student |
-    |:----------:|:---------:|:----------:|:------------:|
-    |   -1.73%   |  -1.81%   |   -0.95%   |    -1.54%    |
-
-<!-- end of list -->
+| symbol | Historique | Bootstrap | Gaussienne | Skew_Student |
+|:------:|:----------:|:---------:|:----------:|:------------:|
+| ^FCHI  |   -6.65%   |  -6.64%   |   -4.20%   |   -11.34%    |
+| ^IXIC  |   -7.27%   |  -7.55%   |   -4.50%   |   -25.66%    |
+| ^N225  |   -6.88%   |  -6.95%   |   -4.57%   |    -7.81%    |
+| ^SSMI  |   -5.57%   |  -5.63%   |   -3.43%   |    -8.24%    |
 
 ### 2.2 Résolution de *l’exercice 2.1* du cours
 
@@ -252,41 +232,49 @@ la valeur à partir de laquelle la tendance est croissante.
 ``` r
 library(evir)
 
-meplot(-renta$France[renta$France < 0])
+layout(matrix(1:4,2,2))
+
+invisible(daily_returns %>%
+            filter(symbol == '^FCHI') %>%
+            reframe(meplot(-dreturns[dreturns < 0])))
+
+invisible(daily_returns %>%
+            filter(symbol == '^IXIC') %>%
+            reframe(meplot(-dreturns[dreturns < 0])))
+
+invisible(daily_returns %>%
+            filter(symbol == '^N225') %>%
+            reframe(meplot(-dreturns[dreturns < 0])))
+
+invisible(daily_returns %>%
+            filter(symbol == '^SSMI') %>%
+            reframe(meplot(-dreturns[dreturns < 0])))
 ```
 
 ![](VaR_files/figure-gfm/var%20TVE-1.png)<!-- -->
 
 ``` r
-meplot(-renta$BRIC[renta$BRIC < 0])
-```
-
-![](VaR_files/figure-gfm/var%20TVE-2.png)<!-- -->
-
-``` r
-meplot(-renta$US_Corporate_Bonds[renta$US_Corporate_Bonds < 0])
-```
-
-![](VaR_files/figure-gfm/var%20TVE-3.png)<!-- -->
-
-``` r
-VaR_TVE <- function(data, alpha, bloc = 21, seuil = 0.01)
+VaR_TVE <- function(data,
+                    alpha,
+                    bloc = 21,
+                    seuil = 0.01)
 {
   # VaR GEV
   g1 <- gev(-data, bloc)
   alphaGEV <- 1 - bloc * alpha
-  GEV <- -qgev(alphaGEV, g1$par.ests["xi"], g1$par.ests["mu"], g1$par.ests["sigma"])
-  GEV <- unname(GEV)
+  GEV <-
+    -qgev(alphaGEV, g1$par.ests["xi"], g1$par.ests["mu"], g1$par.ests["sigma"])
   GEV <- percent(GEV, 0.01)
   
   # VaR GPD
   g2 <- gpd(-data, seuil)
   p <- length(g2$data) / length(data)
   GPD <- -qgpd(1 - alpha / p, g2$par.ests["xi"], seuil, g2$par.ests["beta"])
-  GPD <- unname(GPD)
   GPD <- percent(GPD, 0.01)
   
-  return(c(GEV = GEV, GPD = GPD))
+  tibble(
+    GEV = GEV, 
+    GPD = GPD)
 }
 ```
 
@@ -294,56 +282,32 @@ Voici ci-dessous les VaR TVE demandées dans *l’exercice 2.1* pour les 3
 indices avec alpha = 1%.
 
 ``` r
-l_1 <- list(data = renta, alpha = 0.01, seuil = c(0.03, 0.03, 0.006))
-VaR_1 <-  pmap(l_1, VaR_TVE)
+VaR_1 <- daily_returns %>%
+  group_by(symbol) %>%
+  reframe(VaR_TVE(dreturns, alpha = 0.01, seuil = 0.03))
 pander(VaR_1)
 ```
 
--   **France**:
-
-    |  GEV   |  GPD   |
-    |:------:|:------:|
-    | -3.28% | -4.39% |
-
--   **BRIC**:
-
-    |  GEV   |  GPD   |
-    |:------:|:------:|
-    | -3.13% | -4.05% |
-
--   **US_Corporate_Bonds**:
-
-    |  GEV   |  GPD   |
-    |:------:|:------:|
-    | -0.70% | -0.82% |
-
-<!-- end of list -->
+| symbol |  GEV   |  GPD   |
+|:------:|:------:|:------:|
+| ^FCHI  | -3.11% | -3.85% |
+| ^IXIC  | -3.20% | -4.14% |
+| ^N225  | -3.43% | -3.94% |
+| ^SSMI  | -2.49% | -3.22% |
 
 Voici ci-dessous les VaR TVE demandées dans *l’exercice 2.1* pour les 3
 indices avec alpha = 0.1%.
 
 ``` r
-l_01 <- list(data = renta, alpha = 0.001, seuil = c(0.03, 0.03, 0.006))
-VaR_01 <- pmap(l_01, VaR_TVE)
+VaR_01 <- daily_returns %>%
+  group_by(symbol) %>%
+  reframe(VaR_TVE(dreturns, alpha = 0.001, seuil = 0.03))
 pander(VaR_01)
 ```
 
--   **France**:
-
-    |  GEV   |  GPD   |
-    |:------:|:------:|
-    | -7.40% | -8.13% |
-
--   **BRIC**:
-
-    |  GEV   |  GPD   |
-    |:------:|:------:|
-    | -6.93% | -8.65% |
-
--   **US_Corporate_Bonds**:
-
-    |  GEV   |  GPD   |
-    |:------:|:------:|
-    | -1.39% | -1.77% |
-
-<!-- end of list -->
+| symbol |  GEV   |  GPD   |
+|:------:|:------:|:------:|
+| ^FCHI  | -6.11% | -6.69% |
+| ^IXIC  | -7.02% | -7.36% |
+| ^N225  | -6.43% | -7.21% |
+| ^SSMI  | -5.50% | -5.97% |
