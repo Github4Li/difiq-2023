@@ -3,7 +3,7 @@
 
 Ce *repo* est dédié au cours et aux ateliers avec mes étudiants du DiFiQ de l'Université Paris-Dauphine et de l'Ensae. 
 
-Vous y trouverez le polycopié du cours, les corrigés des exercices après les travaux dirigés dédiés, les données sur lesquelles nous allons travailler, et les codes et résultats des ateliers sur R. Je révélerai les codes qui se cachent derrière les résultats après la fin des ateliers. 
+Vous y trouverez le polycopié du cours, les corrigés des exercices après les travaux dirigés dédiés, les données sur lesquelles nous allons travailler, et les codes et résultats des ateliers sur R.
 
 En préambule de ce cours, il faut que chaque étudiant fasse plusieurs téléchargements sur son ordinateur personnel et suive les 4 étapes suivantes dans l'ordre indiqué :
 
